@@ -1,9 +1,5 @@
 const { supabase } = require('../config/supabase');
 
-/**
- * Auth Middleware — validates token via Supabase auth.getUser()
- * Works with both ECC (P-256) and legacy HMAC JWT keys
- */
 async function authenticate(req, res, next) {
   const authHeader = req.headers.authorization;
 
@@ -21,6 +17,16 @@ async function authenticate(req, res, next) {
     }
 
     req.userId = data.user.id;
+    req.userEmail = data.user.email;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', data.user.id)
+      .single();
+
+    req.userRole = profile?.role || 'user';
+
     next();
   } catch (err) {
     console.error('Auth middleware error:', err.message);
@@ -28,4 +34,11 @@ async function authenticate(req, res, next) {
   }
 }
 
-module.exports = { authenticate };
+function requireAdmin(req, res, next) {
+  if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+}
+
+module.exports = { authenticate, requireAdmin };
